@@ -2,10 +2,58 @@
  * JavaCC template file created by SF JavaCC plugin 1.5.28+ wizard for JavaCC 1.5.0+
  */options{  static = true;}PARSER_BEGIN(Parser)package edu.itsco;
 
-public class Parser{  public static void main(String args []) throws ParseException  {    Parser parser = new Parser(System.in);
-    System.out.println("Bienvenidos al Compilador (Español)");
-    parser.gramaticaPrincipal();
-    System.out.println("Compilo Correctamente");      }}PARSER_END(Parser)SKIP :{  " "| "\r"| "\t"| "\n"}
+import java.util.ArrayList;
+
+public class Parser{
+
+  private static ArrayList <Variable> listaVariables;
+
+    public static void main(String args [])   {
+ 
+    listaVariables = new ArrayList<Variable>();    Parser parser = new Parser(System.in);
+    try { 
+    	System.out.println("Bienvenidos al Compilador (Español)");
+    	parser.gramaticaPrincipal();
+    	System.out.println("Compilo Correctamente");
+  }catch(ParseException pex) {
+    System.err.println(pex.getMessage());
+  }catch(Excepciones es) {
+    System.err.println(es.getMessage());
+  }     }
+
+  private static boolean existeVariable(Variable variable) {
+    return listaVariables.contains(variable);
+  }
+
+  private static void agregarVariable(Variable variable)
+    throws Excepciones { 
+    if(!existeVariable(variable)) {
+      listaVariables.add(variable);
+    }else {
+      throw new Excepciones(variable,
+      Excepciones.Tipo.Variables_Duplicadas);
+    }
+  }
+
+  private static void variableDefinida(Variable variable)
+  throws Excepciones{
+    if(!existeVariable(variable)) {
+      throw new Excepciones(variable,
+      Excepciones.Tipo.Variables_Duplicadas);
+    }
+  }
+
+  private static void variableInicializada(Variable variable)
+  throws Excepciones {
+   //obtener la variable de la lista(referencia)
+   int index = listaVariables.indexOf(variable);
+   variable = listaVariables.get(index);
+   if(!variable.isInicializada()) {
+     throw new Excepciones(variable,
+     Excepciones.Tipo.Variables_no_Inicializadas);    }
+ }
+ 
+}PARSER_END(Parser)SKIP :{  " "| "\r"| "\t"| "\n"}
 //Palabras Reservadas
 TOKEN: {
  < ANN: "ann" >
@@ -67,7 +115,7 @@ TOKEN: {
 | < VALOR_GILBERT: (<digitos>)+"."(<digitos>)+ >
 | < VALOR_MARILLA: "\"" (~["\""])+ "\"" >
 }
-void gramaticaPrincipal():
+void gramaticaPrincipal() throws Excepciones: 
 {
   
 } { 
@@ -75,7 +123,7 @@ void gramaticaPrincipal():
   gramaticaSentencias()
   < CLL>}
 
-void gramaticaSentencias(): {
+void gramaticaSentencias() throws Excepciones: {
 } {
   (
     gramaticaDeclararVariable()
@@ -90,33 +138,71 @@ void gramaticaSentencias(): {
   )+
  }
 
-void gramaticaDeclararVariable(): {
+void gramaticaDeclararVariable()throws Excepciones: {
+  Token id;
+  Token tipoDato;
 } {
-  tipoDato() <ID> [ <IGUAL> valor() ] < PC>
+  tipoDato = tipoDato() id = <ID>
+  {
+    Variable v = new Variable(id.image,tipoDato.image);
+  }
+   [ <IGUAL> valor()
+     { v.setInicializada(true); } 
+   ]
+   { agregarVariable(v);}
+    < PC>
 }
 
-void tipoDato (): {
+Token tipoDato(): {
+  Token tipoDato;
 } {
-   < ANN > | < GILBERT > | < MARILLA >
+  (    tipoDato = < ANN >
+    | tipoDato = < GILBERT >
+    | tipoDato = < MARILLA >
+  )
+  { return tipoDato; }
 }
 
-void valor (): {
+void valor () throws Excepciones: {
+  Token id;
 } {
-    < VALOR_ANN > | < VALOR_GILBERT > | < VALOR_MARILLA> |< ID >
+  (
+    < VALOR_ANN >
+    | < VALOR_GILBERT >
+    | < VALOR_MARILLA>
+    | id = < ID >
+    {
+     Variable v = new Variable();
+     v.setId(id.image);
+     variableDefinida(v);
+     variableInicializada(v);
+   }
+   )
 }
 
-void gramaticaCapturar (): {
+void gramaticaCapturar () throws Excepciones: {
+  Token id;
 } {
-   < COOL > < AP > < ID > < CP > < PC >
+   < COOL > < AP > id = < ID >
+   < CP > < PC >
+   {
+     Variable v = new Variable();
+     v.setId(id.image);
+     variableDefinida(v);
+     int index = listaVariables.indexOf(v);
+     //System.out.println(index);
+     listaVariables.get(index).setInicializada(true);
+     //System.out.println(listaVariables.get(index).isInicializada());
+   }
  }
 
-void gramaticaImprimir (): {
+void gramaticaImprimir () throws Excepciones: {
 } {
     < JERRY > < AP > valor()
           ( < SUMA > valor() )*    < CP > < PC >
 }
 
-void gramaticaSi(): {
+void gramaticaSi() throws Excepciones: {
 } {
    < BASH > < AP > condicion() < CP >
    < ALL >
@@ -127,12 +213,12 @@ void gramaticaSi(): {
        < CLL >]
 }
 
-void condicion (): {
+void condicion () throws Excepciones: {
 } {
    evaluacionSimple() (opLogico() evaluacionSimple())*
  }
 
-void evaluacionSimple(): {
+void evaluacionSimple() throws Excepciones: {
 } {
    valor() opRelacional () valor()
  }
@@ -150,7 +236,7 @@ void opLogico(): {
    < AND > | < OR >
  }
 
-void gramaticaMientras(): {
+void gramaticaMientras()throws Excepciones: {
 } {
    < ELIZA > < AP > condicion() < CP >
    < ALL >
@@ -158,31 +244,49 @@ void gramaticaMientras(): {
    < CLL >
  }
 
-void gramaticaHacerMientras(): {
+void gramaticaHacerMientras()throws Excepciones: {
 } {
    < RACHEL > < ALL >
       gramaticaSentencias()
    < CLL > < ELIZA > < AP > condicion() < CP > < PC >
  }
 
-void gramaticaCambiar(): {
+void gramaticaCambiar()throws Excepciones: {
+  Token id;
 } {
-   < RUBY > < AP > < ID > < CP >
+   < RUBY > < AP > id =  < ID > < CP >
    < ALL >
+ 
    (     < WILLIAM > < VALOR_ANN > < PP > gramaticaSentencias()
      < BILLY > < PC >
    )+
 
    [ < GREEN > gramaticaSentencias() [< BILLY > < PC >] ]
    < CLL >
+   { 
+     Variable v = new Variable();
+     v.setId(id.image);
+     variableDefinida(v);
+     variableInicializada(v);
+     }
  }
 
-void gramaticaAsignacion (): {
-} {
-   < ID > < IGUAL > operacionSimple ()
+void gramaticaAsignacion () throws Excepciones: {
+  Token id;
+}{
+  
+   id = < ID > < IGUAL > operacionSimple ()<PC>
+   {
+     Variable v = new Variable();
+     v.setId(id.image);
+     variableDefinida(v);
+     //
+     int index = listaVariables.indexOf(v);
+     listaVariables.get(index).setInicializada(true);
+   }
  }
 
-void operacionSimple(): {
+void operacionSimple() throws Excepciones: {
 } {
 
    (
@@ -192,7 +296,7 @@ void operacionSimple(): {
      (valor() | operacionParentesis()) )*
   }
 
-void operacionParentesis(): {
+void operacionParentesis()throws Excepciones: {
 } {
    < AP > operacionSimple() < CP >
  }
@@ -203,9 +307,11 @@ void operadorAritmetico(): {
    < SUMA > | < RESTA > | < MULTIPLICACION > | < DIVISION >| < RESIDUO >
  }
 
-void gramaticaPara(): {
+void gramaticaPara()throws Excepciones: {
+  Token id;
 } {
-     < MAY > < AP > < ID > < IGUAL > valor() < PC > condicion () < PC >
+  
+     < MAY > < AP > id= < ID > < IGUAL > valor() < PC > condicion () < PC >
      < ID > (
        < SUMA > < SUMA >
        | < RESTA > < RESTA >
@@ -214,7 +320,13 @@ void gramaticaPara(): {
      < ALL >
          gramaticaSentencias()
      < CLL >
-   }            
+     { 
+     Variable v = new Variable();
+     v.setId(id.image);
+     variableDefinida(v);
+     variableInicializada(v);
+     }
+ }            
 
    
     
